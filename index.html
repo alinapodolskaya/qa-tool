@@ -335,6 +335,62 @@ tbody tr:hover td{background:#fafafa}
         </select>
       </div>
     </div>
+    <div class="form-grid one" style="margin-bottom:14px">
+      <div class="field">
+        <label>Company</label>
+        <select id="f-company">
+          <option value="" selected>Select company… (optional)</option>
+          <option>Advantage Logistics Expedite</option>
+          <option>Alliance Cargo Expedite</option>
+          <option>Allstates Express INC</option>
+          <option>Ally Enterprises LLC</option>
+          <option>Ambufreight INC</option>
+          <option>Atlantic Cargo inc</option>
+          <option>Cargo Alliance</option>
+          <option>Carolina Cargo</option>
+          <option>Carolina Logistic (rpmdispatch)</option>
+          <option>Carolina Transportation</option>
+          <option>Carolina Logistics INC Expedite</option>
+          <option>Continental Log inc</option>
+          <option>Delta Express inc. (Expedite)</option>
+          <option>Delta Express International</option>
+          <option>Delta Express Services Expedite</option>
+          <option>Delta Logistics Inc Expedite</option>
+          <option>DEX Global Inc</option>
+          <option>RHINO Technology</option>
+          <option>Echo express INC Expedite</option>
+          <option>Expedite Alliance Inc</option>
+          <option>Express Permits llc</option>
+          <option>Falcon Logistics INC</option>
+          <option>Green Way Express LLC</option>
+          <option>Greenline PA LLC</option>
+          <option>Highway Express INC Expedite</option>
+          <option>LandSea Transportation INC</option>
+          <option>Link Logistics Inc</option>
+          <option>Logic INC Expedite</option>
+          <option>Main Street logistics INC</option>
+          <option>Muller Worldwide Inc</option>
+          <option>MVP Trucking</option>
+          <option>National Freight Line Expedite</option>
+          <option>Ontime Express Inc</option>
+          <option>Ontrack Transportation Inc Expedite</option>
+          <option>Owner Dispatch Inc</option>
+          <option>Pacific Transportation Inc</option>
+          <option>Pioneer Logistics Expedite</option>
+          <option>Precise Transportation</option>
+          <option>Premium Logistics INC</option>
+          <option>Prime Time Freight INC</option>
+          <option>Rainier Transportation Expedite</option>
+          <option>Reefer Van Network LLC</option>
+          <option>RPP Express Expedite</option>
+          <option>Select Logistics Expedite</option>
+          <option>Sound Transportation Expedite</option>
+          <option>Superior Transportation Inc Expedite</option>
+          <option>United Alliance Inc</option>
+          <option>US Inbound</option>
+        </select>
+      </div>
+    </div>
 
     <hr class="form-divider">
 
@@ -448,11 +504,10 @@ tbody tr:hover td{background:#fafafa}
 
     <!-- RECORDING UPLOAD -->
     <div class="form-section-title">
-      <span>3 · Recording</span>
-      <span class="pill pill-teal">Uploads to Google Drive</span>
+      <span>3 · Recordings</span>
+      <span class="pill pill-teal">Up to 5 files · Google Drive</span>
     </div>
     <div class="field" style="margin-bottom:0">
-      <label>Audio file</label>
       <!-- Auth button shown when not signed in -->
       <div id="authWrap" style="margin-bottom:10px;display:none">
         <button type="button" class="btn" onclick="signInGoogle()" style="width:100%;justify-content:center;gap:8px">
@@ -461,20 +516,14 @@ tbody tr:hover td{background:#fafafa}
         </button>
       </div>
       <div id="uploadZone" style="border:1.5px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--surface2);transition:all .15s" onclick="document.getElementById('f-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--red)'" ondragleave="this.style.borderColor=''" ondrop="handleDrop(event)">
-        <input type="file" id="f-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.ogg,.mp4" style="display:none" onchange="handleFileSelect(this)">
+        <input type="file" id="f-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.ogg,.mp4" multiple style="display:none" onchange="handleFileSelect(this)">
         <svg width="24" height="24" fill="none" stroke="var(--muted)" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <div id="uploadLabel" style="font-size:13px;color:var(--muted)">Click or drag to upload recording</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'DM Mono',monospace">mp3, wav, m4a, mp4…</div>
+        <div style="font-size:13px;color:var(--muted)">Click or drag to add recordings</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'DM Mono',monospace">mp3, wav, m4a, mp4 · max 5 files</div>
       </div>
-      <div id="uploadProgress" style="display:none;margin-top:10px">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--good-bg);border:1px solid var(--good-border);border-radius:9px">
-          <svg width="16" height="16" fill="none" stroke="var(--good)" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          <span id="uploadFileName" style="font-size:13px;color:var(--good);font-family:'DM Mono',monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-          <button type="button" onclick="clearFile()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 2px">×</button>
-        </div>
-      </div>
+      <div id="fileList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
       <div id="uploadingWrap" style="display:none;margin-top:10px">
-        <div style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:#1d4ed8;font-family:'DM Mono',monospace">
+        <div style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:#1d4ed8;font-family:'DM Mono',monospace" id="uploadingText">
           ⏳ Uploading to Drive…
         </div>
       </div>
@@ -507,14 +556,14 @@ tbody tr:hover td{background:#fafafa}
       <table>
         <thead>
           <tr>
-            <th>Date</th><th>Identifier</th><th>Agent</th><th>Dept</th><th>Position</th>
+            <th>Date</th><th>Identifier</th><th>Agent</th><th>Dept</th><th>Position</th><th>Company</th>
             <th>CS Rating</th><th>Safety</th><th>Rep. Risk</th><th>Negotiation</th><th>Communication</th>
             <th>Recording</th><th>Notes</th><th>Reviewer</th>
           </tr>
         </thead>
         <tbody id="tableBody">
           <tr class="empty-row">
-            <td colspan="13"><span class="empty-icon">◎</span>No entries yet — data saves directly to Google Sheets</td>
+            <td colspan="14"><span class="empty-icon">◎</span>No entries yet — data saves directly to Google Sheets</td>
           </tr>
         </tbody>
       </table>
@@ -561,7 +610,7 @@ const DRIVE_FOLDER_ID = '1vcpr7mqz8L14_QluTyxXSmt1l7Tvdk0t';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let tokenClient = null;
 let accessToken = null;
-let selectedFile = null;
+let selectedFiles = [];
 let entries = [];
 let csRating = null;
 const detected = {safety:false, rep:false, neg:false, drv:false};
@@ -636,28 +685,48 @@ async function uploadToDrive(file, fileName) {
 }
 
 function handleFileSelect(input) {
-  if (input.files && input.files[0]) setFile(input.files[0]);
+  if (input.files) addFiles(Array.from(input.files));
 }
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('uploadZone').style.borderColor = '';
-  if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer.files) addFiles(Array.from(e.dataTransfer.files));
 }
-function setFile(file) {
-  selectedFile = file;
-  document.getElementById('uploadZone').style.display = 'none';
-  document.getElementById('uploadProgress').style.display = 'block';
-  document.getElementById('uploadFileName').textContent = file.name;
+function addFiles(files) {
+  files.forEach(f => {
+    if (selectedFiles.length >= 5) { showToast('Max 5 files per entry', 'err'); return; }
+    if (selectedFiles.find(x => x.name === f.name)) return; // no duplicates
+    selectedFiles.push(f);
+  });
+  renderFileList();
+}
+function removeFile(idx) {
+  selectedFiles.splice(idx, 1);
+  renderFileList();
+}
+function renderFileList() {
+  const fl = document.getElementById('fileList');
+  fl.innerHTML = selectedFiles.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--good-bg);border:1px solid var(--good-border);border-radius:9px">
+      <svg width="14" height="14" fill="none" stroke="var(--good)" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      <span style="font-size:12px;color:var(--good);font-family:'DM Mono',monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+      <button type="button" onclick="removeFile(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 2px">×</button>
+    </div>
+  `).join('');
+  // Show/hide add zone based on count
+  const zone = document.getElementById('uploadZone');
+  if(accessToken) zone.style.display = selectedFiles.length >= 5 ? 'none' : 'block';
 }
 function clearFile() {
-  selectedFile = null;
+  selectedFiles = [];
   document.getElementById('f-file').value = '';
-  document.getElementById('uploadProgress').style.display = 'none';
+  document.getElementById('fileList').innerHTML = '';
   document.getElementById('uploadingWrap').style.display = 'none';
   if (accessToken) {
     document.getElementById('uploadZone').style.display = 'block';
   } else {
     document.getElementById('authWrap').style.display = 'block';
+    document.getElementById('uploadZone').style.display = 'none';
   }
 }
 
@@ -690,7 +759,7 @@ function toggleDeptOther(sel){
 function resetForm(){
   ['f-date','f-id','f-agent','f-topic','f-comment','f-dept-other','f-safety','f-rep','f-neg','f-drv']
     .forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList.remove('error');}});
-  ['f-dept','f-position','f-reviewer']
+  ['f-dept','f-position','f-reviewer','f-company']
     .forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList.remove('error');}});
   csRating=null;
   document.querySelectorAll('.cs-btn').forEach(b=>b.classList.remove('active'));
@@ -699,7 +768,7 @@ function resetForm(){
     document.getElementById('cat-'+k).classList.remove('detected');
     document.getElementById('badge-'+k).textContent='Not detected';
   });
-  selectedFile=null;
+  selectedFiles = [];
   clearFile();
 }
 
@@ -734,6 +803,7 @@ async function saveEntry(){
   const entry={
     date,id,agent,dept,position,
     topic:   document.getElementById('f-topic').value.trim(),
+    company: document.getElementById('f-company').value,
     reviewer:document.getElementById('f-reviewer').value,
     csRating,
     safetyFlag:   detected.safety?'Yes':'No',
@@ -767,19 +837,29 @@ async function saveEntry(){
   ].filter(Boolean).join('_');
 
   try{
-    // 1. Upload file to Drive if selected
-    let driveLink = '';
-    if(selectedFile){
-      if(!accessToken){ showToast('Please sign in with Google first to upload file','err'); btn.disabled=false; btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Save to Google Sheets'; return; }
-      document.getElementById('uploadProgress').style.display='none';
+    // 1. Upload files to Drive
+    const driveLinks = [];
+    if(selectedFiles.length > 0){
+      if(!accessToken){ showToast('Please sign in with Google first to upload files','err'); btn.disabled=false; btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Save to Google Sheets'; return; }
       document.getElementById('uploadingWrap').style.display='block';
-      const fileName = prefix + '_' + selectedFile.name;
-      driveLink = await uploadToDrive(selectedFile, fileName);
+      for(let i=0; i<selectedFiles.length; i++){
+        document.getElementById('uploadingText').textContent = `⏳ Uploading file ${i+1} of ${selectedFiles.length}…`;
+        const fileName = prefix + '_' + selectedFiles[i].name;
+        const link = await uploadToDrive(selectedFiles[i], fileName);
+        driveLinks.push(link);
+      }
       document.getElementById('uploadingWrap').style.display='none';
     }
 
     // 2. Save form data to Sheets
-    const payload = {...entry, driveLink};
+    const payload = {
+      ...entry,
+      driveLink:  driveLinks[0] || '',
+      driveLink2: driveLinks[1] || '',
+      driveLink3: driveLinks[2] || '',
+      driveLink4: driveLinks[3] || '',
+      driveLink5: driveLinks[4] || ''
+    };
     await fetch(SHEET_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -787,11 +867,11 @@ async function saveEntry(){
       body: JSON.stringify(payload)
     });
 
-    entries.unshift({...entry, driveLink});
+    entries.unshift({...entry, driveLink: driveLinks[0]||null});
     resetForm();
     document.getElementById('formCard').classList.remove('open');
     renderAll();
-    showToast(driveLink ? '✓ Saved + uploaded to Drive' : '✓ Saved to Google Sheets', 'ok');
+    showToast(driveLinks.length > 0 ? `✓ Saved + ${driveLinks.length} file(s) uploaded to Drive` : '✓ Saved to Google Sheets', 'ok');
   }catch(e){
     document.getElementById('uploadingWrap').style.display='none';
     showToast('Error: ' + e.message, 'err');
@@ -807,7 +887,7 @@ function renderTable(){
   const n=entries.length;
   document.getElementById('entry-count').textContent=n+' record'+(n!==1?'s':'');
   const tb=document.getElementById('tableBody');
-  if(!n){tb.innerHTML='<tr class="empty-row"><td colspan="12"><span class="empty-icon">◎</span>No entries yet</td></tr>';return;}
+  if(!n){tb.innerHTML='<tr class="empty-row"><td colspan="13"><span class="empty-icon">◎</span>No entries yet</td></tr>';return;}
 
   function flagCell(flag,detail,color){
     if(flag!=='Yes') return '<span style="color:#ccc;font-size:11px">—</span>';
@@ -820,6 +900,7 @@ function renderTable(){
     <td style="font-size:12px">${esc(e.agent)}</td>
     <td class="cell-sm">${esc(e.dept)}</td>
     <td class="cell-sm">${esc(e.position)}</td>
+    <td class="cell-sm">${esc(e.company)||'—'}</td>
     <td><span class="badge badge-${e.csRating.toLowerCase()}">${e.csRating}</span></td>
     <td>${flagCell(e.safetyFlag,e.safetyDetail,'#d97706')}</td>
     <td>${flagCell(e.repFlag,e.repDetail,'#e63030')}</td>
