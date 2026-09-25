@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA · Performance Monitoring</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f8;--white:#fff;--surface:#fff;--surface2:#f0f1f4;
+  --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.13);
+  --text:#2d3142;--muted:#8b90a0;
+  --red:#e63030;--red-light:#fce8e8;--red-border:rgba(230,48,48,0.25);
+  --good:#16a34a;--good-bg:#f0fdf4;--good-border:rgba(22,163,74,0.25);
+  --avg:#f97316;--avg-bg:#fff4ed;--avg-border:rgba(249,115,22,0.25);
+  --shadow:0 2px 16px rgba(0,0,0,0.07);--shadow-lg:0 8px 32px rgba(0,0,0,0.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;overflow-x:hidden}
+
+.bubbles-canvas{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.bubble{position:absolute;border-radius:50%;animation:floatBubble linear infinite;opacity:0}
+@keyframes floatBubble{0%{transform:translateY(0) rotate(0deg);opacity:0}8%{opacity:var(--op)}90%{opacity:var(--op)}100%{transform:translateY(-110vh) rotate(360deg);opacity:0}}
+.bubble.arc{border-radius:0;background:transparent}
+.bubble.arc::before{content:'';display:block;width:100%;height:100%;border-radius:50%;border:3.5px solid currentColor;clip-path:inset(0 0 50% 0)}
+
+.page{position:relative;z-index:1}
+header{padding:16px 40px;background:rgba(255,255,255,0.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 12px rgba(0,0,0,0.06)}
+.qa-logo{display:flex;align-items:center;gap:12px}
+.qa-text{display:flex;flex-direction:column;line-height:1.25}
+.qa-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text)}
+.qa-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+.header-right{display:flex;gap:10px;align-items:center}
+.status-pill{display:flex;align-items:center;gap:7px;font-family:'DM Mono',monospace;font-size:11px;color:var(--good);background:var(--good-bg);border:1px solid var(--good-border);padding:5px 12px;border-radius:20px}
+.status-pill span{width:6px;height:6px;border-radius:50%;background:var(--good);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:9px 18px;border-radius:10px;border:1px solid var(--border2);background:var(--white);color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.btn:hover{background:var(--surface2);box-shadow:none}
+.btn-red{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 2px 8px rgba(230,48,48,0.25)}
+.btn-red:hover{background:#c72020;border-color:#c72020;box-shadow:none}
+.btn-save{background:var(--good-bg);border-color:var(--good-border);color:var(--good)}
+.btn-save:hover{background:#dcfce7}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+main{padding:32px 40px 60px;max-width:1360px;margin:0 auto}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--muted);opacity:.2}
+.stat-card.s-bad::after{background:var(--red);opacity:.6}
+.stat-card.s-good::after{background:var(--good);opacity:.6}
+.stat-card.s-warn::after{background:#f59e0b;opacity:.6}
+.stat-card.s-purple::after{background:#7c3aed;opacity:.6}
+.stat-label{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.stat-val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:var(--text);line-height:1}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.stat-card.s-bad .stat-val{color:var(--red)}
+.stat-card.s-good .stat-val{color:var(--good)}
+.stat-card.s-warn .stat-val{color:#d97706}
+.stat-card.s-purple .stat-val{color:#7c3aed}
+
+/* CHARTS */
+.charts-row{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-bottom:28px}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;box-shadow:var(--shadow)}
+.chart-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--text);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.chart-title small{font-size:11px;font-weight:400;color:var(--muted);font-family:'DM Sans',sans-serif;margin-left:auto}
+.bar-chart{display:flex;align-items:flex-end;gap:10px;height:110px}
+.bar-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1}
+.bar{width:100%;border-radius:5px 5px 0 0;min-height:3px;transition:height .5s cubic-bezier(.4,0,.2,1);position:relative;cursor:default}
+.bar:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;z-index:10}
+.bar-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);text-align:center;line-height:1.3}
+.donut-wrap{display:flex;align-items:center;gap:24px}
+.donut-legend{display:flex;flex-direction:column;gap:9px;flex:1}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.legend-label{color:var(--muted);font-size:11px}
+.legend-val{font-family:'DM Mono',monospace;color:var(--text);margin-left:auto;font-size:12px;font-weight:500}
+
+/* FLAGS SUMMARY */
+.flags-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+.flag-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px}
+.flag-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.flag-info{flex:1;min-width:0}
+.flag-name{font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.flag-count{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;line-height:1}
+
+/* FORM */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;margin-bottom:24px;box-shadow:var(--shadow);display:none}
+.form-card.open{display:block;animation:slideDown .2s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.form-section-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.pill{font-size:10px;font-family:'DM Mono',monospace;padding:2px 8px;border-radius:20px;font-weight:400}
+.pill-blue{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.pill-red{background:#fce8e8;color:#991b1b;border:1px solid #fca5a5}
+.pill-amber{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.pill-purple{background:#f5f3ff;color:#5b21b6;border:1px solid #c4b5fd}
+.pill-teal{background:#f0fdfa;color:#065f46;border:1px solid #6ee7b7}
+.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.form-grid.two{grid-template-columns:1fr 1fr}
+.form-divider{border:none;border-top:1px solid var(--border);margin:22px 0}
+.field label{display:block;font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.req{color:var(--red);margin-left:2px}
+.field input,.field textarea,.field select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(230,48,48,0.08);background:var(--white)}
+.field textarea{resize:vertical;min-height:74px}
+.field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b90a0' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+.field input.error,.field textarea.error,.field select.error{border-color:var(--red);background:var(--red-light)}
+
+/* CS RATING */
+.cs-rating{display:flex;gap:10px;margin-top:6px}
+.cs-btn{flex:1;padding:14px 8px;border-radius:12px;border:1.5px solid var(--border2);background:var(--surface2);font-family:'Syne',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+.cs-btn .cs-icon{font-size:20px}
+.cs-btn .cs-sub{font-size:11px;font-family:'DM Mono',monospace;font-weight:400;color:var(--muted)}
+.cs-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.cs-btn.excellent{border-color:var(--good-border);background:var(--good-bg)}.cs-btn.excellent .cs-sub{color:var(--good)}.cs-btn.excellent.active{box-shadow:0 0 0 3px rgba(22,163,74,0.2);border-color:var(--good)}
+.cs-btn.average{border-color:var(--avg-border);background:var(--avg-bg)}.cs-btn.average .cs-sub{color:var(--avg)}.cs-btn.average.active{box-shadow:0 0 0 3px rgba(249,115,22,0.2);border-color:var(--avg)}
+.cs-btn.poor{border-color:var(--red-border);background:var(--red-light)}.cs-btn.poor .cs-sub{color:var(--red)}.cs-btn.poor.active{box-shadow:0 0 0 3px rgba(230,48,48,0.2);border-color:var(--red)}
+
+/* DETECTED CATEGORIES GRID */
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cat-card{border:1.5px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .15s;background:var(--surface)}
+.cat-card.detected{border-color:var(--cat-color)}
+.cat-header{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;background:var(--surface2);transition:background .15s}
+.cat-header:hover{background:#eaebee}
+.cat-card.detected .cat-header{background:var(--cat-bg)}
+.cat-title-wrap{display:flex;align-items:center;gap:9px}
+.cat-icon{width:30px;height:30px;border-radius:8px;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;transition:background .15s}
+.cat-card.detected .cat-icon{background:var(--cat-color);color:#fff}
+.cat-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--text)}
+.cat-badge{font-size:10px;font-family:'DM Mono',monospace;padding:2px 8px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border2);transition:all .15s}
+.cat-card.detected .cat-badge{background:var(--cat-color);color:#fff;border-color:var(--cat-color)}
+.cat-body{padding:14px 16px;display:none;border-top:1px solid var(--border)}
+.cat-card.detected .cat-body{display:block;border-color:var(--cat-color-light)}
+.cat-body .field label{font-size:10px}
+
+/* TABLE */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text)}
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:1000px}
+thead{background:var(--surface2)}
+th{padding:10px 14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#fafafa}
+.cell-mono{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.cell-sm{font-size:11px;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;white-space:nowrap;gap:4px}
+.badge-excellent{background:var(--good-bg);color:var(--good);border:1px solid var(--good-border)}
+.badge-average{background:var(--avg-bg);color:var(--avg);border:1px solid var(--avg-border)}
+.badge-poor{background:var(--red-light);color:var(--red);border:1px solid var(--red-border)}
+.flag-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:6px;font-size:10px;font-family:'DM Mono',monospace;font-weight:500;margin:2px 2px 2px 0}
+
+.empty-row td{text-align:center;padding:52px;color:var(--muted);font-size:13px}
+.empty-icon{font-size:30px;display:block;margin-bottom:10px;opacity:.35}
+
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);padding:11px 20px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:all .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast-ok{background:var(--good-bg);color:var(--good);border:1px solid var(--good-border);box-shadow:var(--shadow)}
+.toast-err{background:var(--red-light);color:var(--red);border:1px solid var(--red-border);box-shadow:var(--shadow)}
+
+</style>
+</head>
+<body>
+
+<div class="bubbles-canvas" id="bubblesCanvas"></div>
+
+<div class="page">
+<header>
+  <div class="qa-logo">
+    <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" width="42" height="42">
+      <circle cx="22" cy="22" r="20" fill="#e63030"/>
+      <circle cx="22" cy="22" r="11" fill="white"/>
+      <rect x="27" y="27" width="22" height="10" rx="5" fill="#e63030" transform="rotate(45 33 32)"/>
+    </svg>
+    <div class="qa-text">
+      <span class="qa-title">Performance Monitoring</span>
+      <span class="qa-sub">Call QA Feedback</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span></span>Google Sheets connected</div>
+    <div id="drivePill" style="display:flex;align-items:center;gap:7px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:5px 12px;border-radius:20px">○ Drive</div>
+    <button class="btn btn-red" onclick="toggleForm()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add entry
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <!-- STATS ROW -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total entries</div>
+      <div class="stat-val" id="s-total">0</div>
+      <div class="stat-sub">this session</div>
+    </div>
+    <div class="stat-card s-bad">
+      <div class="stat-label">Poor CS</div>
+      <div class="stat-val" id="s-bad">0</div>
+      <div class="stat-sub" id="s-bad-pct">—</div>
+    </div>
+    <div class="stat-card s-good">
+      <div class="stat-label">Excellent CS</div>
+      <div class="stat-val" id="s-good">0</div>
+      <div class="stat-sub" id="s-good-pct">—</div>
+    </div>
+    <div class="stat-card s-warn">
+      <div class="stat-label">Flags detected</div>
+      <div class="stat-val" id="s-flags">0</div>
+      <div class="stat-sub">across all categories</div>
+    </div>
+    <div class="stat-card s-purple">
+      <div class="stat-label">Safety violations</div>
+      <div class="stat-val" id="s-safety">0</div>
+      <div class="stat-sub">high priority</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Customer Service breakdown <small id="chart-count">0 entries</small></div>
+      <div class="bar-chart" id="barChart">
+        <div style="color:var(--muted);font-size:12px;width:100%;text-align:center;padding-top:36px">No data yet</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Detected flags by category</div>
+      <div id="flagsChart" style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:24px 0">No data yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLAGS SUMMARY ROW -->
+  <div class="flags-row">
+    <div class="flag-stat">
+      <div class="flag-icon" style="background:#fef3c7;color:#d97706"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div class="flag-info">
+        <div class="flag-name">Safety Violations</div>
+        <div class="flag-count" id="fc-safety" style="color:#d97706">0</div>
+      </div>
+    </div>
+    <div class="flag-stat">
+      <div class="flag-icon" style="background:#fce8e8;color:#e63030"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="flag-info">
+        <div class="flag-name">Reputational Risk</div>
+        <div class="flag-count" id="fc-rep" style="color:#e63030">0</div>
+      </div>
+    </div>
+    <div class="flag-stat">
+      <div class="flag-icon" style="background:#f5f3ff;color:#7c3aed"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+      <div class="flag-info">
+        <div class="flag-name">Negotiation</div>
+        <div class="flag-count" id="fc-neg" style="color:#7c3aed">0</div>
+      </div>
+    </div>
+    <div class="flag-stat">
+      <div class="flag-icon" style="background:#f0fdfa;color:#0d9488"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="flag-info">
+        <div class="flag-name">Communication</div>
+        <div class="flag-count" id="fc-drv" style="color:#0d9488">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div id="formCard" class="form-card">
+
+    <!-- BASIC INFO -->
+    <div class="form-grid">
+      <div class="field">
+        <label>Call date <span class="req">*</span></label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="field">
+        <label>Call identifier <span class="req">*</span></label>
+        <input type="text" id="f-id" placeholder="ID, email, domain, time…">
+      </div>
+      <div class="field">
+        <label>Agent name <span class="req">*</span></label>
+        <input type="text" id="f-agent" placeholder="Agent's name">
+      </div>
+    </div>
+    <div class="form-grid two">
+      <div class="field">
+        <label>Department <span class="req">*</span></label>
+        <select id="f-dept" onchange="toggleDeptOther(this)">
+          <option value="" disabled selected>Select department…</option>
+          <option>Booking Reefer</option>
+          <option>Booking 360</option>
+          <option>Booking Sylectus</option>
+          <option>Booking Owners Team</option>
+          <option>Operations</option>
+          <option>Sales Team</option>
+          <option value="Other">Other…</option>
+        </select>
+      </div>
+      <div class="field" id="dept-other-wrap" style="display:none">
+        <label>Specify department <span class="req">*</span></label>
+        <input type="text" id="f-dept-other" placeholder="Enter department name…">
+      </div>
+      <div class="field">
+        <label>Position <span class="req">*</span></label>
+        <select id="f-position">
+          <option value="" disabled selected>Select position…</option>
+          <option>Specialist</option>
+          <option>Team Lead</option>
+          <option>Manager</option>
+          <option>General Manager</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid two">
+      <div class="field">
+        <label>Topic / call type</label>
+        <input type="text" id="f-topic" placeholder="e.g. complaint, status check…">
+      </div>
+      <div class="field">
+        <label>Reviewed by</label>
+        <select id="f-reviewer">
+          <option value="" disabled selected>Select reviewer…</option>
+          <option>Kate</option><option>Tania</option><option>Nikki</option>
+          <option>Jake</option><option>Alina S</option><option>Alina H</option>
+          <option>Ann</option><option>Valentyna</option><option>Dana</option>
+          <option>Aliaksei</option><option>Ivan</option>
+          <option>Anatolii</option><option>Yevhenii</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid one" style="margin-bottom:14px">
+      <div class="field">
+        <label>Company</label>
+        <select id="f-company">
+          <option value="" selected>Select company… (optional)</option>
+          <option>Advantage Logistics Expedite</option>
+          <option>Alliance Cargo Expedite</option>
+          <option>Allstates Express INC</option>
+          <option>Ally Enterprises LLC</option>
+          <option>Ambufreight INC</option>
+          <option>Atlantic Cargo inc</option>
+          <option>Cargo Alliance</option>
+          <option>Carolina Cargo</option>
+          <option>Carolina Logistic (rpmdispatch)</option>
+          <option>Carolina Transportation</option>
+          <option>Carolina Logistics INC Expedite</option>
+          <option>Continental Log inc</option>
+          <option>Delta Express inc. (Expedite)</option>
+          <option>Delta Express International</option>
+          <option>Delta Express Services Expedite</option>
+          <option>Delta Logistics Inc Expedite</option>
+          <option>DEX Global Inc</option>
+          <option>RHINO Technology</option>
+          <option>Echo express INC Expedite</option>
+          <option>Expedite Alliance Inc</option>
+          <option>Express Permits llc</option>
+          <option>Falcon Logistics INC</option>
+          <option>Green Way Express LLC</option>
+          <option>Greenline PA LLC</option>
+          <option>Highway Express INC Expedite</option>
+          <option>LandSea Transportation INC</option>
+          <option>Link Logistics Inc</option>
+          <option>Logic INC Expedite</option>
+          <option>Main Street logistics INC</option>
+          <option>Muller Worldwide Inc</option>
+          <option>MVP Trucking</option>
+          <option>National Freight Line Expedite</option>
+          <option>Ontime Express Inc</option>
+          <option>Ontrack Transportation Inc Expedite</option>
+          <option>Owner Dispatch Inc</option>
+          <option>Pacific Transportation Inc</option>
+          <option>Pioneer Logistics Expedite</option>
+          <option>Precise Transportation</option>
+          <option>Premium Logistics INC</option>
+          <option>Prime Time Freight INC</option>
+          <option>Rainier Transportation Expedite</option>
+          <option>Reefer Van Network LLC</option>
+          <option>RPP Express Expedite</option>
+          <option>Select Logistics Expedite</option>
+          <option>Sound Transportation Expedite</option>
+          <option>Superior Transportation Inc Expedite</option>
+          <option>United Alliance Inc</option>
+          <option>US Inbound</option>
+        </select>
+      </div>
+    </div>
+
+    <hr class="form-divider">
+
+    <!-- 1. CUSTOMER SERVICE -->
+    <div class="form-section-title">
+      <span>1 · Customer Service</span>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Overall rating</label>
+      <div class="cs-rating">
+        <button type="button" class="cs-btn excellent" data-v="Excellent" onclick="setCS('Excellent')">
+          <span class="cs-icon">★</span><span>Excellent</span><span class="cs-sub">Top performance</span>
+        </button>
+        <button type="button" class="cs-btn average" data-v="Average" onclick="setCS('Average')">
+          <span class="cs-icon">◈</span><span>Average</span><span class="cs-sub">Room to improve</span>
+        </button>
+        <button type="button" class="cs-btn poor" data-v="Poor" onclick="setCS('Poor')">
+          <span class="cs-icon">▽</span><span>Poor</span><span class="cs-sub">Needs attention</span>
+        </button>
+      </div>
+    </div>
+
+    <hr class="form-divider">
+
+    <!-- DETECTED CATEGORIES -->
+    <div class="form-section-title">
+      <span>2 · Issue Categories</span>
+      <span class="pill pill-red">Select all that apply</span>
+    </div>
+    <div class="cat-grid">
+
+      <!-- SAFETY VIOLATIONS -->
+      <div class="cat-card" id="cat-safety" style="--cat-color:#d97706;--cat-bg:#fffbeb;--cat-color-light:#fde68a">
+        <div class="cat-header" onclick="toggleCat('safety')">
+          <div class="cat-title-wrap">
+            <div class="cat-icon"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div>
+              <div class="cat-name">Safety Violations</div>
+            </div>
+          </div>
+          <span class="cat-badge" id="badge-safety">Not detected</span>
+        </div>
+        <div class="cat-body" id="body-safety">
+          <div class="field">
+            <label>Description <span class="req">*</span></label>
+            <textarea id="f-safety" placeholder="Describe the safety violation observed…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPUTATIONAL RISK -->
+      <div class="cat-card" id="cat-rep" style="--cat-color:#e63030;--cat-bg:#fef2f2;--cat-color-light:#fecaca">
+        <div class="cat-header" onclick="toggleCat('rep')">
+          <div class="cat-title-wrap">
+            <div class="cat-icon"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            <div>
+              <div class="cat-name">Reputational Risk</div>
+            </div>
+          </div>
+          <span class="cat-badge" id="badge-rep">Not detected</span>
+        </div>
+        <div class="cat-body" id="body-rep">
+          <div class="field">
+            <label>Description <span class="req">*</span></label>
+            <textarea id="f-rep" placeholder="Describe the reputational risk…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEGOTIATION -->
+      <div class="cat-card" id="cat-neg" style="--cat-color:#7c3aed;--cat-bg:#f5f3ff;--cat-color-light:#ddd6fe">
+        <div class="cat-header" onclick="toggleCat('neg')">
+          <div class="cat-title-wrap">
+            <div class="cat-icon"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+            <div>
+              <div class="cat-name">Negotiation</div>
+            </div>
+          </div>
+          <span class="cat-badge" id="badge-neg">Not detected</span>
+        </div>
+        <div class="cat-body" id="body-neg">
+          <div class="field">
+            <label>Description <span class="req">*</span></label>
+            <textarea id="f-neg" placeholder="Describe the negotiation issue…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMMUNICATION WITH DRIVERS -->
+      <div class="cat-card" id="cat-drv" style="--cat-color:#0d9488;--cat-bg:#f0fdfa;--cat-color-light:#99f6e4">
+        <div class="cat-header" onclick="toggleCat('drv')">
+          <div class="cat-title-wrap">
+            <div class="cat-icon"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div>
+              <div class="cat-name">Communication</div>
+            </div>
+          </div>
+          <span class="cat-badge" id="badge-drv">Not detected</span>
+        </div>
+        <div class="cat-body" id="body-drv">
+          <div class="field">
+            <label>Description <span class="req">*</span></label>
+            <textarea id="f-drv" placeholder="Describe the driver communication issue…"></textarea>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /cat-grid -->
+
+    <hr class="form-divider">
+
+    <!-- RECORDING UPLOAD -->
+    <div class="form-section-title">
+      <span>3 · Recordings</span>
+      <span class="pill pill-teal">Up to 5 files · Google Drive</span>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <!-- Auth button shown when not signed in -->
+      <div id="authWrap" style="margin-bottom:10px;display:none">
+        <button type="button" class="btn" onclick="signInGoogle()" style="width:100%;justify-content:center;gap:8px">
+          <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+          Sign in with Google to upload
+        </button>
+      </div>
+      <div id="uploadZone" style="border:1.5px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--surface2);transition:all .15s" onclick="document.getElementById('f-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--red)'" ondragleave="this.style.borderColor=''" ondrop="handleDrop(event)">
+        <input type="file" id="f-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.ogg,.mp4" multiple style="display:none" onchange="handleFileSelect(this)">
+        <svg width="24" height="24" fill="none" stroke="var(--muted)" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div style="font-size:13px;color:var(--muted)">Click or drag to add recordings</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'DM Mono',monospace">mp3, wav, m4a, mp4 · max 5 files</div>
+      </div>
+      <div id="fileList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+      <div id="uploadingWrap" style="display:none;margin-top:10px">
+        <div style="padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:#1d4ed8;font-family:'DM Mono',monospace" id="uploadingText">
+          ⏳ Uploading to Drive…
+        </div>
+      </div>
+    </div>
+
+    <hr class="form-divider">
+
+    <!-- GENERAL NOTES -->
+    <div class="field">
+      <label>General notes</label>
+      <textarea id="f-comment" placeholder="Any other observations about this call…" style="min-height:60px"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+      <button class="btn" onclick="toggleForm()">Cancel</button>
+      <button class="btn btn-save" id="saveBtn" onclick="saveEntry()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Save to Google Sheets
+      </button>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="section-header">
+    <div class="section-title">Entries this session</div>
+    <span style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace" id="entry-count">0 records</span>
+  </div>
+  <div class="table-card">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Identifier</th><th>Agent</th><th>Dept</th><th>Position</th><th>Company</th>
+            <th>CS Rating</th><th>Safety</th><th>Rep. Risk</th><th>Negotiation</th><th>Communication</th>
+            <th>Recording</th><th>Notes</th><th>Reviewer</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr class="empty-row">
+            <td colspan="14"><span class="empty-icon">◎</span>No entries yet — data saves directly to Google Sheets</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SHEET_URL='https://script.google.com/macros/s/AKfycbyzpaByLuZCwiC7EUukNae0Nn99ketkrOf4sSVWvKZ2WFzR3GEBjklkBwbMo1uePM1E/exec';
+const CATS=['safety','rep','neg','drv'];
+const CAT_LABELS={safety:'Safety Violations',rep:'Reputational Risk',neg:'Negotiation',drv:'Communication'};
+const CAT_COLORS={safety:'#d97706',rep:'#e63030',neg:'#7c3aed',drv:'#0d9488'};
+
+/* BUBBLES */
+(function(){
+  const canvas=document.getElementById('bubblesCanvas');
+  const colors=[
+    {stroke:'#d1d1d1',op:.55},{stroke:'#b8b8b8',op:.45},{stroke:'#e0e0e0',op:.60},
+    {stroke:'#c8c8c8',op:.40},{stroke:'#a8a8a8',op:.35},{stroke:'#e8a8a8',op:.30},
+    {stroke:'#d98080',op:.22},{stroke:'#f0c8c8',op:.40},{stroke:'#ececec',op:.55},
+  ];
+  const sizes=[16,22,30,38,48,20,28,36];
+  function make(){
+    const el=document.createElement('div');
+    el.className='bubble'+(Math.random()>.45?' arc':'');
+    const c=colors[Math.floor(Math.random()*colors.length)];
+    const s=sizes[Math.floor(Math.random()*sizes.length)];
+    const dur=14+Math.random()*18,delay=Math.random()*20;
+    el.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;bottom:-${s+20}px;color:${c.stroke};border:3.5px solid ${c.stroke};--op:${c.op};animation-duration:${dur}s;animation-delay:${delay}s;opacity:0;`;
+    canvas.appendChild(el);
+    setTimeout(()=>el.remove(),(dur+delay)*1000+500);
+  }
+  for(let i=0;i<28;i++) make();
+  setInterval(make,1100);
+})();
+
+/* ── OAUTH + DRIVE UPLOAD ── */
+const CLIENT_ID = '156088014157-bubvjmqa1rcmm4rnbais12nnl38p0plu.apps.googleusercontent.com';
+const DRIVE_FOLDER_ID = '1vcpr7mqz8L14_QluTyxXSmt1l7Tvdk0t';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+let tokenClient = null;
+let accessToken = null;
+let selectedFiles = [];
+let entries = [];
+let csRating = null;
+const detected = {safety:false, rep:false, neg:false, drv:false};
+
+function initGoogleAuth() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: (resp) => {
+      if (resp.error) { showToast('Auth error: ' + resp.error, 'err'); return; }
+      accessToken = resp.access_token;
+      document.getElementById('authWrap').style.display = 'none';
+      document.getElementById('uploadZone').style.display = 'block';
+      // Update header status
+      const pill = document.getElementById('drivePill');
+      if(pill){ pill.textContent = '● Drive connected'; pill.style.color = 'var(--good)'; }
+      // Auto-refresh token before it expires (55 min)
+      setTimeout(()=>{ tokenClient.requestAccessToken({prompt:''}); }, 55*60*1000);
+    }
+  });
+  // Auto sign in silently on page load
+  document.getElementById('authWrap').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'none';
+  // Try silent sign in first
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    prompt: '',
+    callback: (resp) => {
+      if (resp.error) {
+        // Silent failed — show sign in button
+        document.getElementById('authWrap').style.display = 'block';
+        return;
+      }
+      accessToken = resp.access_token;
+      document.getElementById('authWrap').style.display = 'none';
+      document.getElementById('uploadZone').style.display = 'block';
+      const pill = document.getElementById('drivePill');
+      if(pill){ pill.textContent = '● Drive connected'; pill.style.color = 'var(--good)'; }
+      setTimeout(()=>{ tokenClient.requestAccessToken({prompt:''}); }, 55*60*1000);
+    }
+  });
+  tokenClient.requestAccessToken({prompt:''});
+}
+
+function signInGoogle() {
+  tokenClient.requestAccessToken({prompt:'select_account'});
+}
+
+async function uploadToDrive(file, fileName) {
+  // Create subfolder by dept name if needed - upload to root folder directly
+  const meta = { name: fileName, parents: [DRIVE_FOLDER_ID] };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+  form.append('file', file);
+
+  const resp = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+    { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken }, body: form }
+  );
+  if (!resp.ok) throw new Error('Drive upload failed: ' + resp.status);
+  const data = await resp.json();
+
+  // Make file shareable
+  await fetch(`https://www.googleapis.com/drive/v3/files/${data.id}/permissions`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' })
+  });
+
+  return data.webViewLink;
+}
+
+function handleFileSelect(input) {
+  if (input.files) addFiles(Array.from(input.files));
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').style.borderColor = '';
+  if (e.dataTransfer.files) addFiles(Array.from(e.dataTransfer.files));
+}
+function addFiles(files) {
+  files.forEach(f => {
+    if (selectedFiles.length >= 5) { showToast('Max 5 files per entry', 'err'); return; }
+    if (selectedFiles.find(x => x.name === f.name)) return; // no duplicates
+    selectedFiles.push(f);
+  });
+  renderFileList();
+}
+function removeFile(idx) {
+  selectedFiles.splice(idx, 1);
+  renderFileList();
+}
+function renderFileList() {
+  const fl = document.getElementById('fileList');
+  fl.innerHTML = selectedFiles.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--good-bg);border:1px solid var(--good-border);border-radius:9px">
+      <svg width="14" height="14" fill="none" stroke="var(--good)" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      <span style="font-size:12px;color:var(--good);font-family:'DM Mono',monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+      <button type="button" onclick="removeFile(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 2px">×</button>
+    </div>
+  `).join('');
+  // Show/hide add zone based on count
+  const zone = document.getElementById('uploadZone');
+  if(accessToken) zone.style.display = selectedFiles.length >= 5 ? 'none' : 'block';
+}
+function clearFile() {
+  selectedFiles = [];
+  document.getElementById('f-file').value = '';
+  document.getElementById('fileList').innerHTML = '';
+  document.getElementById('uploadingWrap').style.display = 'none';
+  if (accessToken) {
+    document.getElementById('uploadZone').style.display = 'block';
+  } else {
+    document.getElementById('authWrap').style.display = 'block';
+    document.getElementById('uploadZone').style.display = 'none';
+  }
+}
+
+function toggleForm(){
+  const fc=document.getElementById('formCard');
+  if(fc.classList.contains('open')){fc.classList.remove('open');resetForm();}
+  else fc.classList.add('open');
+}
+
+function setCS(v){
+  csRating=v;
+  document.querySelectorAll('.cs-btn').forEach(b=>{b.classList.remove('active');if(b.dataset.v===v)b.classList.add('active');});
+}
+
+function toggleCat(key){
+  detected[key]=!detected[key];
+  const card=document.getElementById('cat-'+key);
+  const badge=document.getElementById('badge-'+key);
+  card.classList.toggle('detected',detected[key]);
+  badge.textContent=detected[key]?'Detected':'Not detected';
+  if(!detected[key]) document.getElementById('f-'+key).value='';
+}
+
+function toggleDeptOther(sel){
+  const wrap=document.getElementById('dept-other-wrap');
+  wrap.style.display=sel.value==='Other'?'block':'none';
+  if(sel.value!=='Other') document.getElementById('f-dept-other').value='';
+}
+
+function resetForm(){
+  ['f-date','f-id','f-agent','f-topic','f-comment','f-dept-other','f-safety','f-rep','f-neg','f-drv']
+    .forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList.remove('error');}});
+  ['f-dept','f-position','f-reviewer','f-company']
+    .forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList.remove('error');}});
+  csRating=null;
+  document.querySelectorAll('.cs-btn').forEach(b=>b.classList.remove('active'));
+  CATS.forEach(k=>{
+    detected[k]=false;
+    document.getElementById('cat-'+k).classList.remove('detected');
+    document.getElementById('badge-'+k).textContent='Not detected';
+  });
+  selectedFiles = [];
+  clearFile();
+}
+
+async function saveEntry(){
+  const date    =document.getElementById('f-date').value;
+  const id      =document.getElementById('f-id').value.trim();
+  const agent   =document.getElementById('f-agent').value.trim();
+  const deptRaw =document.getElementById('f-dept').value;
+  const deptOther=document.getElementById('f-dept-other').value.trim();
+  const dept    =deptRaw==='Other'?(deptOther||'Other'):deptRaw;
+  const position=document.getElementById('f-position').value;
+
+  ['f-date','f-id','f-agent','f-dept','f-dept-other','f-position','f-safety','f-rep','f-neg','f-drv']
+    .forEach(x=>document.getElementById(x).classList.remove('error'));
+
+  let hasErr=false;
+  if(!date)    {document.getElementById('f-date').classList.add('error');hasErr=true;}
+  if(!id)      {document.getElementById('f-id').classList.add('error');hasErr=true;}
+  if(!agent)   {document.getElementById('f-agent').classList.add('error');hasErr=true;}
+  if(!deptRaw) {document.getElementById('f-dept').classList.add('error');hasErr=true;}
+  if(deptRaw==='Other'&&!deptOther){document.getElementById('f-dept-other').classList.add('error');hasErr=true;}
+  if(!position){document.getElementById('f-position').classList.add('error');hasErr=true;}
+
+  // Validate detected categories have comments
+  CATS.forEach(k=>{
+    if(detected[k]&&!document.getElementById('f-'+k).value.trim()){
+      document.getElementById('f-'+k).classList.add('error');hasErr=true;
+    }
+  });
+  if(hasErr){showToast('Please fill in all required fields','err');return;}
+
+  const entry={
+    date,id,agent,dept,position,
+    topic:   document.getElementById('f-topic').value.trim(),
+    company: document.getElementById('f-company').value,
+    reviewer:document.getElementById('f-reviewer').value,
+    csRating,
+    safetyFlag:   detected.safety?'Yes':'No',
+    safetyDetail: detected.safety?document.getElementById('f-safety').value.trim():'',
+    repFlag:   detected.rep?'Yes':'No',
+    repDetail: detected.rep?document.getElementById('f-rep').value.trim():'',
+    negFlag:   detected.neg?'Yes':'No',
+    negDetail: detected.neg?document.getElementById('f-neg').value.trim():'',
+    drvFlag:   detected.drv?'Yes':'No',
+    drvDetail: detected.drv?document.getElementById('f-drv').value.trim():'',
+    comment: document.getElementById('f-comment').value.trim()
+  };
+
+  const btn=document.getElementById('saveBtn');
+  btn.disabled=true;
+  btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="30"><animate attributeName="stroke-dashoffset" values="30;0;30" dur="1s" repeatCount="indefinite"/></circle></svg> Saving…';
+
+  // Build filename prefix
+  const flags=[
+    detected.safety?'Safety':'',
+    detected.rep?'RepRisk':'',
+    detected.neg?'Negotiation':'',
+    detected.drv?'Communication':''
+  ].filter(Boolean);
+  const prefix=[
+    entry.date,
+    entry.agent.replace(/\s+/g,''),
+    entry.dept.replace(/\s+/g,''),
+    entry.csRating||'',
+    ...flags
+  ].filter(Boolean).join('_');
+
+  try{
+    // 1. Upload files to Drive
+    const driveLinks = [];
+    if(selectedFiles.length > 0){
+      if(!accessToken){ showToast('Please sign in with Google first to upload files','err'); btn.disabled=false; btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Save to Google Sheets'; return; }
+      document.getElementById('uploadingWrap').style.display='block';
+      for(let i=0; i<selectedFiles.length; i++){
+        document.getElementById('uploadingText').textContent = `⏳ Uploading file ${i+1} of ${selectedFiles.length}…`;
+        const fileName = prefix + '_' + selectedFiles[i].name;
+        const link = await uploadToDrive(selectedFiles[i], fileName);
+        driveLinks.push(link);
+      }
+      document.getElementById('uploadingWrap').style.display='none';
+    }
+
+    // 2. Save form data to Sheets
+    const payload = {
+      ...entry,
+      driveLink:  driveLinks[0] || '',
+      driveLink2: driveLinks[1] || '',
+      driveLink3: driveLinks[2] || '',
+      driveLink4: driveLinks[3] || '',
+      driveLink5: driveLinks[4] || ''
+    };
+    await fetch(SHEET_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+
+    entries.unshift({...entry, driveLink: driveLinks[0]||null});
+    resetForm();
+    document.getElementById('formCard').classList.remove('open');
+    renderAll();
+    showToast(driveLinks.length > 0 ? `✓ Saved + ${driveLinks.length} file(s) uploaded to Drive` : '✓ Saved to Google Sheets', 'ok');
+  }catch(e){
+    document.getElementById('uploadingWrap').style.display='none';
+    showToast('Error: ' + e.message, 'err');
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Save to Google Sheets';
+  }
+}
+
+function renderAll(){renderTable();renderStats();renderCharts();}
+
+function renderTable(){
+  const n=entries.length;
+  document.getElementById('entry-count').textContent=n+' record'+(n!==1?'s':'');
+  const tb=document.getElementById('tableBody');
+  if(!n){tb.innerHTML='<tr class="empty-row"><td colspan="13"><span class="empty-icon">◎</span>No entries yet</td></tr>';return;}
+
+  function flagCell(flag,detail,color){
+    if(flag!=='Yes') return '<span style="color:#ccc;font-size:11px">—</span>';
+    return `<span class="flag-badge" style="background:${color}18;color:${color};border:1px solid ${color}44" title="${esc(detail)}">⚑ Detected</span>`;
+  }
+
+  tb.innerHTML=entries.map(e=>`<tr>
+    <td class="cell-mono">${e.date}</td>
+    <td class="cell-mono" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.id)}">${esc(e.id)}</td>
+    <td style="font-size:12px">${esc(e.agent)}</td>
+    <td class="cell-sm">${esc(e.dept)}</td>
+    <td class="cell-sm">${esc(e.position)}</td>
+    <td class="cell-sm">${esc(e.company)||'—'}</td>
+    <td><span class="badge badge-${e.csRating.toLowerCase()}">${e.csRating}</span></td>
+    <td>${flagCell(e.safetyFlag,e.safetyDetail,'#d97706')}</td>
+    <td>${flagCell(e.repFlag,e.repDetail,'#e63030')}</td>
+    <td>${flagCell(e.negFlag,e.negDetail,'#7c3aed')}</td>
+    <td>${flagCell(e.drvFlag,e.drvDetail,'#0d9488')}</td>
+    <td>${e.driveLink?`<a href="${e.driveLink}" target="_blank" style="color:var(--good);font-size:11px;font-family:'DM Mono',monospace">▶ Play</a>`:'<span style="color:#ccc;font-size:11px">—</span>'}</td>
+    <td class="cell-sm" style="max-width:160px;white-space:pre-wrap">${esc(e.comment)||'—'}</td>
+    <td class="cell-sm">${esc(e.reviewer)||'—'}</td>
+  </tr>`).join('');
+}
+
+function renderStats(){
+  const n=entries.length;
+  const poor=entries.filter(e=>e.csRating==='Poor').length;
+  const exc =entries.filter(e=>e.csRating==='Excellent').length;
+  const safety=entries.filter(e=>e.safetyFlag==='Yes').length;
+  const flags=entries.reduce((s,e)=>s+(e.safetyFlag==='Yes'?1:0)+(e.repFlag==='Yes'?1:0)+(e.negFlag==='Yes'?1:0)+(e.drvFlag==='Yes'?1:0),0);
+  const rep=entries.filter(e=>e.repFlag==='Yes').length;
+  const neg=entries.filter(e=>e.negFlag==='Yes').length;
+  const drv=entries.filter(e=>e.drvFlag==='Yes').length;
+
+  document.getElementById('s-total').textContent=n;
+  document.getElementById('s-bad').textContent=poor;
+  document.getElementById('s-bad-pct').textContent=n?Math.round(poor/n*100)+'% of calls':'—';
+  document.getElementById('s-good').textContent=exc;
+  document.getElementById('s-good-pct').textContent=n?Math.round(exc/n*100)+'% of calls':'—';
+  document.getElementById('s-flags').textContent=flags;
+  document.getElementById('s-safety').textContent=safety;
+  document.getElementById('fc-safety').textContent=safety;
+  document.getElementById('fc-rep').textContent=rep;
+  document.getElementById('fc-neg').textContent=neg;
+  document.getElementById('fc-drv').textContent=drv;
+}
+
+function renderCharts(){
+  const n=entries.length;
+  document.getElementById('chart-count').textContent=n+' entr'+(n!==1?'ies':'y');
+
+  // Bar chart CS
+  const exc =entries.filter(e=>e.csRating==='Excellent').length;
+  const avg =entries.filter(e=>e.csRating==='Average').length;
+  const poor=entries.filter(e=>e.csRating==='Poor').length;
+  const maxC=Math.max(exc,avg,poor,1);
+  const bc=document.getElementById('barChart');
+  if(!n){bc.innerHTML='<div style="color:var(--muted);font-size:12px;width:100%;text-align:center;padding-top:36px">No data yet</div>';}
+  else{
+    const bars=[{label:'Excellent',count:exc,color:'#16a34a'},{label:'Average',count:avg,color:'#f97316'},{label:'Poor',count:poor,color:'#e63030'}];
+    bc.innerHTML=bars.map(b=>{
+      const h=Math.max(Math.round((b.count/maxC)*100),b.count?4:0);
+      return`<div class="bar-wrap"><div class="bar" style="height:${h}px;background:${b.color};opacity:${b.count?.85:.15}" data-tip="${b.count} call${b.count!==1?'s':''}"></div><span class="bar-label">${b.label}</span></div>`;
+    }).join('');
+  }
+
+  // Flags horizontal bar chart
+  const fc=document.getElementById('flagsChart');
+  const flagData=[
+    {label:'Safety Violations',count:entries.filter(e=>e.safetyFlag==='Yes').length,color:'#d97706'},
+    {label:'Reputational Risk',count:entries.filter(e=>e.repFlag==='Yes').length,color:'#e63030'},
+    {label:'Negotiation',count:entries.filter(e=>e.negFlag==='Yes').length,color:'#7c3aed'},
+    {label:'Communication',count:entries.filter(e=>e.drvFlag==='Yes').length,color:'#0d9488'},
+  ];
+  const maxF=Math.max(...flagData.map(f=>f.count),1);
+  if(!n){fc.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:24px 0">No data yet</div>';}
+  else{
+    fc.innerHTML=flagData.map(f=>`
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:11px;color:var(--muted);width:110px;flex-shrink:0;font-family:'DM Mono',monospace">${f.label}</div>
+        <div style="flex:1;background:#f0f1f4;border-radius:4px;height:10px;overflow:hidden">
+          <div style="width:${Math.max((f.count/maxF)*100,f.count?6:0)}%;height:100%;background:${f.color};border-radius:4px;transition:width .5s ease;opacity:${f.count?.85:.2}"></div>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:${f.color};width:20px;text-align:right">${f.count}</div>
+      </div>
+    `).join('');
+  }
+}
+
+function esc(s){return s?(s+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show toast-'+(type==='ok'?'ok':'err');
+  setTimeout(()=>{t.className='toast';},3200);
+}
+
+document.getElementById('f-date').valueAsDate=new Date();
+renderAll();
+</script>
+<script src="https://accounts.google.com/gsi/client" onload="initGoogleAuth()" async defer></script>
+</body>
+</html>
